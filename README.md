@@ -23,7 +23,7 @@ Una **Dynamic Island** minimalista estilo Apple para **Amazon Music (Unlimited /
       .---------------------------------------------------.
      (  [::]  Cancion Actual · Artista              ||||   )
       '---------------------------------------------------'
-       ^Portada                                     ^Ecualizador 7 FPS
+       ^Portada                                     ^Ecualizador 14 FPS
 ```
 
 ### 2. Modo Isla Expandida (`584 x 480 px` — Reproductor + SonicRadar Mix)
@@ -87,7 +87,7 @@ Una **Dynamic Island** minimalista estilo Apple para **Amazon Music (Unlimited /
 
 - **Diseno estilo Apple Dynamic Island:** Pildora compacta negra mate (`216 x 26 px`) con iconos 100% vectoriales renderizados con `QPainter`, portada del album en tiempo real, titulo/artista y ecualizador animado.
 - **Controles completos de reproduccion:** Botones vectoriales nativos para **Shuffle** (Aleatorio), **Anterior**, **Play/Pause**, **Siguiente** y **Repeat** (Repeticion) sincronizados con el reproductor web y MPRIS2.
-- **FreshFlow (Filtro de frescura inteligente):** Evita que el algoritmo de Amazon Music repita las mismas canciones una y otra vez. Registra pistas escuchadas en una tabla hash ultraligera (`< 16 KB` de RAM, maximo 300 entradas en `~/.cache/amazon-music-notch/freshflow.json`) y salta automaticamente cualquier pista que ya haya sonado en las ultimas 18 horas.
+- **FreshFlow (Filtro de frescura inteligente):** Evita que el algoritmo de Amazon Music repita las mismas canciones una y otra vez. Registra pistas escuchadas en una tabla hash ultraligera (`< 16 KB` de RAM, maximo 300 entradas en `~/.local/share/amazon-music-notch/freshflow.json`) y salta automaticamente cualquier pista que ya haya sonado en las ultimas 18 horas.
 - **SonicRadar (Generador de Playlist de Descubrimiento):** Con un clic, toma el artista actual o tus artistas escuchados recientemente, consulta afinidad real de oyentes mediante la API publica de Deezer, descarta canciones ya escuchadas en **FreshFlow** y genera una **playlist variada de 20 canciones (`SonicRadar Mix`)** que se reproduce de forma continua controlando el buscador interno (SPA) de Amazon Music sin recargar la pagina.
 - **Reproductor Amazon Music integrado:** Incluye el reproductor oficial de Amazon Music dentro del propio notch con soporte para **Widevine DRM** y modo escritorio forzado (sin bloqueos de *"Escuchar en la app"*).
 - **Ultra optimizado (Bajo consumo de RAM y CPU):**
@@ -122,3 +122,5 @@ Para ejecutarlo o alternar su despliegue desde terminal o atajo de teclado:
 ~/.cache/amazon-music-notch/amazon-music-notch          # Inicia el notch
 ~/.cache/amazon-music-notch/amazon-music-notch --toggle # Abre/cierra la isla
 ```
+
+La sesion de Amazon (cookies), los ajustes y el historial de FreshFlow viven en `~/.local/share/amazon-music-notch/` (se migran solos desde `~/.cache` la primera vez que arranca).

@@ -42,6 +42,8 @@
 #include <QSettings>
 #include <QStandardPaths>
 #include <QDir>
+#include <QFileInfo>
+#include <QVersionNumber>
 #include <QFile>
 #include <QWebEngineView>
 #include <QWebEngineProfile>
@@ -104,7 +106,7 @@ protected:
 
         if (m_type == CloseApp) {
             QColor bg = pressed ? QColor(255, 59, 48, 220)
-                                : (hovered ? QColor(255, 69, 58, 190) : QColor(255, 69, 58, 48));
+                                : (hovered ? QColor(255, 69, 58, 190) : QColor(255, 69, 58, 0));
             p.setPen(Qt::NoPen);
             p.setBrush(bg);
             p.drawEllipse(rect().adjusted(1, 1, -1, -1));
@@ -118,9 +120,8 @@ protected:
             p.drawEllipse(rect().adjusted(1, 1, -1, -1));
         }
 
-        QColor fg = (m_type == CloseApp && !hovered) ? QColor(255, 110, 100, 240)
-                    : (m_active ? QColor(255, 255, 255, 255)
-                                : (hovered ? QColor(255, 255, 255, 250) : QColor(255, 255, 255, 195)));
+        QColor fg = m_active ? QColor(255, 255, 255, 255)
+                             : (hovered ? QColor(255, 255, 255, 250) : QColor(255, 255, 255, 195));
         p.setPen(QPen(fg, 1.5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
         p.setBrush(fg);
 
@@ -298,11 +299,25 @@ public:
     }
 
     void setPixmap(const QPixmap &px) {
+        m_scaled = QPixmap();
         if (!px.isNull()) {
-            // Pre-scale pixmap once when assigned instead of scaling on every paintEvent!
-            m_scaled = px.scaled(size() * devicePixelRatioF(), Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
-        } else {
-            m_scaled = QPixmap();
+            // Escala y redondea una sola vez. setClipPath no suaviza bordes; un pincel de textura si.
+            const qreal dpr = devicePixelRatioF();
+            const QSize target = size() * dpr;
+            const QPixmap scaled = px.scaled(target, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
+            QPixmap baked(target);
+            baked.fill(Qt::transparent);
+            {
+                QPainter bp(&baked);
+                bp.setRenderHint(QPainter::Antialiasing, true);
+                bp.setPen(Qt::NoPen);
+                bp.setBrush(QBrush(scaled));
+                bp.setBrushOrigin(QPointF(target.width() - scaled.width(), target.height() - scaled.height()) / 2.0);
+                const qreal r = qMin(target.width(), target.height()) * 0.24;
+                bp.drawRoundedRect(QRectF(QPointF(0, 0), QSizeF(target)), r, r);
+            }
+            baked.setDevicePixelRatio(dpr);
+            m_scaled = baked;
         }
         update();
     }
@@ -312,14 +327,14 @@ protected:
         QPainter p(this);
         p.setRenderHint(QPainter::Antialiasing, true);
 
-        QPainterPath path;
-        qreal radius = qMin(width(), height()) * 0.24;
-        path.addRoundedRect(rect(), radius, radius);
-        p.setClipPath(path);
-
         if (!m_scaled.isNull()) {
             p.drawPixmap(rect(), m_scaled);
         } else {
+            QPainterPath path;
+            qreal radius = qMin(width(), height()) * 0.24;
+            path.addRoundedRect(rect(), radius, radius);
+            p.setClipPath(path);
+
             // Sleek pitch-black & silver geometric Antigravity/Apple fallback mark
             QLinearGradient grad(0, 0, width(), height());
             grad.setColorAt(0.0, QColor(28, 30, 36));
@@ -352,7 +367,7 @@ public:
     explicit EqualizerWidget(QWidget *parent = nullptr) : QWidget(parent) {
         setFixedSize(15, 13);
         m_timer = new QTimer(this);
-        // Low-overhead 7 FPS (140ms) equalizer refresh so CPU stays near 0%
+        // 14 FPS (70ms); el timer solo corre mientras suena y el widget esta visible
         connect(m_timer, &QTimer::timeout, this, &EqualizerWidget::step);
         m_heights = {0.30f, 0.70f, 0.45f, 0.60f};
     }
@@ -360,26 +375,27 @@ public:
     void setPlaying(bool playing) {
         if (m_playing == playing) return;
         m_playing = playing;
-        if (m_playing) {
-            m_timer->start(140);
-        } else {
-            m_timer->stop();
+        if (!m_playing) {
             m_heights = {0.22f, 0.22f, 0.22f, 0.22f};
             update();
         }
+        syncTimer();
     }
 
 private slots:
     void step() {
         m_tick++;
-        m_heights[0] = 0.22f + 0.65f * qAbs(qSin(m_tick * 0.50f));
-        m_heights[1] = 0.25f + 0.72f * qAbs(qCos(m_tick * 0.68f));
-        m_heights[2] = 0.22f + 0.65f * qAbs(qSin(m_tick * 0.82f + 1.1f));
-        m_heights[3] = 0.22f + 0.52f * qAbs(qCos(m_tick * 0.58f + 2.0f));
+        m_heights[0] = 0.22f + 0.65f * qAbs(qSin(m_tick * 0.25f));
+        m_heights[1] = 0.25f + 0.72f * qAbs(qCos(m_tick * 0.34f));
+        m_heights[2] = 0.22f + 0.65f * qAbs(qSin(m_tick * 0.41f + 1.1f));
+        m_heights[3] = 0.22f + 0.52f * qAbs(qCos(m_tick * 0.29f + 2.0f));
         update();
     }
 
 protected:
+    void showEvent(QShowEvent *) override { m_shown = true; syncTimer(); }
+    void hideEvent(QHideEvent *) override { m_shown = false; syncTimer(); }
+
     void paintEvent(QPaintEvent *) override {
         QPainter p(this);
         p.setRenderHint(QPainter::Antialiasing, true);
@@ -400,9 +416,18 @@ protected:
     }
 
 private:
+    void syncTimer() {
+        if (m_playing && m_shown) {
+            if (!m_timer->isActive()) m_timer->start(70);
+        } else {
+            m_timer->stop();
+        }
+    }
+
     QTimer *m_timer;
     QList<float> m_heights;
     bool m_playing = false;
+    bool m_shown = false;
     int m_tick = 0;
 };
 
@@ -414,11 +439,52 @@ static QString appCacheDir() {
     return dir;
 }
 
+// Sesion de Amazon (cookies), ajustes e historial: un limpiador de ~/.cache no debe borrarlos.
+static QString appDataDir() {
+    QString base = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation);
+    if (base.isEmpty()) base = QDir::homePath() + QStringLiteral("/.local/share");
+    QString dir = base + QStringLiteral("/amazon-music-notch");
+    QDir().mkpath(dir);
+    return dir;
+}
+
+// Mueve una sola vez el estado de versiones anteriores (que vivia en ~/.cache).
+static void migrateLegacyState() {
+    for (const char *name : {"config.ini", "freshflow.json", "webprofile"}) {
+        const QString from = appCacheDir() + QLatin1Char('/') + QLatin1String(name);
+        const QString to = appDataDir() + QLatin1Char('/') + QLatin1String(name);
+        if (!QFileInfo::exists(to) && QFileInfo::exists(from)) QDir().rename(from, to);
+    }
+}
+
+// Widevine mas reciente de Brave/Chrome/Chromium; la carpeta de version cambia con cada actualizacion.
+static QString findWidevineLib() {
+    const QString rel = QStringLiteral("/_platform_specific/linux_x64/libwidevinecdm.so");
+    const QString cfg = QDir::homePath() + QStringLiteral("/.config/");
+    const QStringList roots = {
+        cfg + QStringLiteral("BraveSoftware/Brave-Browser/WidevineCdm"),
+        cfg + QStringLiteral("google-chrome/WidevineCdm"),
+        cfg + QStringLiteral("chromium/WidevineCdm")
+    };
+    QString best;
+    QVersionNumber bestVer;
+    for (const QString &root : roots) {
+        const QStringList dirs = QDir(root).entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+        for (const QString &v : dirs) {
+            const QVersionNumber ver = QVersionNumber::fromString(v);
+            const QString lib = root + QLatin1Char('/') + v + rel;
+            if (ver > bestVer && QFile::exists(lib)) { bestVer = ver; best = lib; }
+        }
+    }
+    const QString sys = QStringLiteral("/opt/google/chrome/WidevineCdm") + rel;
+    return (best.isEmpty() && QFile::exists(sys)) ? sys : best;
+}
+
 class DynamicNotch : public QWidget {
     Q_OBJECT
 
 public:
-    DynamicNotch() : m_settings(appCacheDir() + QStringLiteral("/config.ini"), QSettings::IniFormat) {
+    DynamicNotch() : m_settings(appDataDir() + QStringLiteral("/config.ini"), QSettings::IniFormat) {
         setWindowFlags(Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::Tool);
         setAttribute(Qt::WA_TranslucentBackground, true);
         setMouseTracking(true);
@@ -563,11 +629,6 @@ public slots:
         m_expandedContainer->hide();
         applyPillSize(m_compactSize);
         m_compactContainer->show();
-
-        // Put Chromium renderer into low-power background mode when collapsed (keeps audio playing, stops GPU DOM compositing!)
-        if (m_webView && m_webView->page()) {
-            m_webView->page()->runJavaScript(QStringLiteral("if (document.activeElement) document.activeElement.blur();"));
-        }
     }
 
 protected:
@@ -950,7 +1011,6 @@ private:
         plLayout->addWidget(m_playlistWidget, 1);
 
         m_expLayout->addWidget(m_playlistPanel);
-        ensureWebViewInitialized();
 
         holderLayout->addWidget(m_compactContainer);
         holderLayout->addWidget(m_expandedContainer);
@@ -960,7 +1020,7 @@ private:
         if (m_webView) return;
 
         QWebEngineProfile *profile = new QWebEngineProfile(QStringLiteral("AmazonMusicNotch"), this);
-        profile->setPersistentStoragePath(appCacheDir() + QStringLiteral("/webprofile"));
+        profile->setPersistentStoragePath(appDataDir() + QStringLiteral("/webprofile"));
         profile->setCachePath(appCacheDir() + QStringLiteral("/webcache"));
         profile->setHttpCacheType(QWebEngineProfile::DiskHttpCache);
         profile->setHttpCacheMaximumSize(64 * 1024 * 1024); // Cap disk cache at 64 MB
@@ -1229,7 +1289,7 @@ private:
     }
 
     void loadTrackHistory() {
-        QFile f(appCacheDir() + QStringLiteral("/freshflow.json"));
+        QFile f(appDataDir() + QStringLiteral("/freshflow.json"));
         if (!f.open(QIODevice::ReadOnly)) return;
         QJsonObject root = QJsonDocument::fromJson(f.readAll()).object();
         QJsonObject hist = root.value(QStringLiteral("history")).toObject();
@@ -1266,7 +1326,7 @@ private:
         root.insert(QStringLiteral("history"), hist);
         root.insert(QStringLiteral("seeds"), seeds);
 
-        QFile f(appCacheDir() + QStringLiteral("/freshflow.json"));
+        QFile f(appDataDir() + QStringLiteral("/freshflow.json"));
         if (f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
             f.write(QJsonDocument(root).toJson(QJsonDocument::Compact));
         }
@@ -1867,6 +1927,7 @@ private:
                 connect(client, &QLocalSocket::disconnected, client, &QObject::deleteLater);
             }
         });
+        m_ipcServer->setSocketOptions(QLocalServer::UserAccessOption);
         m_ipcServer->listen(QStringLiteral("amazon-music-notch-ipc"));
     }
 
@@ -2008,9 +2069,7 @@ int main(int argc, char *argv[]) {
     qputenv("QT_QPA_PLATFORM", "wayland");
 
     // Performance & Low-RAM flags for embedded Chromium so it runs featherlight even with 100+ browser tabs open!
-    QString widevinePath = QDir::homePath() + QStringLiteral("/.config/BraveSoftware/Brave-Browser/WidevineCdm/4.10.3112.0/_platform_specific/linux_x64/libwidevinecdm.so");
     QString chromiumFlags = QStringLiteral(
-        "--widevine-path=%1 "
         "--autoplay-policy=no-user-gesture-required "
         "--enable-features=Widevine "
         "--renderer-process-limit=1 "
@@ -2018,7 +2077,11 @@ int main(int argc, char *argv[]) {
         "--disable-component-update "
         "--disable-domain-reliability "
         "--disable-sync"
-    ).arg(widevinePath);
+    );
+    const QString widevinePath = findWidevineLib();
+    if (!widevinePath.isEmpty()) {
+        chromiumFlags.prepend(QStringLiteral("--widevine-path=%1 ").arg(widevinePath));
+    }
     qputenv("QTWEBENGINE_CHROMIUM_FLAGS", chromiumFlags.toUtf8());
 
     QApplication app(argc, argv);
@@ -2038,6 +2101,8 @@ int main(int argc, char *argv[]) {
             return 0;
         }
     }
+
+    migrateLegacyState();
 
     DynamicNotch notch;
     notch.setupLayerShell();
