@@ -490,7 +490,13 @@ public:
         int screenH = scr ? scr->geometry().height() : 1080;
         int clampedX = qBound(0, m_posX, qMax(0, screenW - width()));
         int clampedY = qBound(0, m_posY, qMax(0, screenH - height()));
+        m_posX = clampedX;
+        m_posY = clampedY;
         m_layerWindow->setMargins(QMargins(clampedX, clampedY, 0, 0));
+        if (QWindow *w = windowHandle()) {
+            w->requestUpdate();
+        }
+        update();
     }
 
 public slots:
@@ -609,9 +615,16 @@ protected:
 
     void mousePressEvent(QMouseEvent *event) override {
         if (event->button() == Qt::LeftButton) {
+            // In expanded mode, only start drag from the top header bar (y <= 48)
+            if (m_expanded && event->position().y() > 48) {
+                QWidget::mousePressEvent(event);
+                return;
+            }
             m_pressLocalPos = event->position().toPoint();
             m_dragging = false;
             m_mouseDown = true;
+            m_lastDragStepMs = 0;
+            m_autoCollapseTimer->stop();
             event->accept();
             return;
         }
@@ -619,20 +632,37 @@ protected:
     }
 
     void mouseMoveEvent(QMouseEvent *event) override {
+        if (m_mouseDown && !(event->buttons() & Qt::LeftButton)) {
+            m_mouseDown = false;
+            m_dragging = false;
+            releaseMouse();
+            unsetCursor();
+            return;
+        }
         if (m_mouseDown && (event->buttons() & Qt::LeftButton)) {
             QPoint delta = event->position().toPoint() - m_pressLocalPos;
             if (!m_pinned) {
                 if (!m_dragging && delta.manhattanLength() > 4) {
                     m_dragging = true;
+                    m_autoCollapseTimer->stop();
                     setCursor(Qt::ClosedHandCursor);
+                    grabMouse();
                 }
                 if (m_dragging) {
-                    QScreen *scr = QGuiApplication::primaryScreen();
-                    int screenW = scr ? scr->geometry().width() : 1920;
-                    int screenH = scr ? scr->geometry().height() : 1080;
-                    m_posX = qBound(0, m_posX + delta.x(), screenW - width());
-                    m_posY = qBound(0, m_posY + delta.y(), screenH - height());
-                    applyLayerMargins();
+                    // Wayland wlr-layer-shell margins are double-buffered and applied by KWin on vblank (~16ms).
+                    // Waiting 22ms + forcing repaint() (wl_surface.commit) ensures KWin has moved the surface
+                    // and updated wl_pointer local coordinates before we sample the next delta!
+                    qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
+                    if (nowMs - m_lastDragStepMs >= 22 && (qAbs(delta.x()) > 1 || qAbs(delta.y()) > 1)) {
+                        m_lastDragStepMs = nowMs;
+                        QScreen *scr = QGuiApplication::primaryScreen();
+                        int screenW = scr ? scr->geometry().width() : 1920;
+                        int screenH = scr ? scr->geometry().height() : 1080;
+                        m_posX = qBound(0, m_posX + delta.x(), qMax(0, screenW - width()));
+                        m_posY = qBound(0, m_posY + delta.y(), qMax(0, screenH - height()));
+                        applyLayerMargins();
+                        repaint();
+                    }
                 }
             }
             event->accept();
@@ -644,6 +674,7 @@ protected:
     void mouseReleaseEvent(QMouseEvent *event) override {
         if (event->button() == Qt::LeftButton && m_mouseDown) {
             m_mouseDown = false;
+            releaseMouse();
             unsetCursor();
             if (m_dragging) {
                 m_dragging = false;
@@ -701,13 +732,16 @@ private:
 
         // --- COMPACT MODE (216 x 26 px) ---
         m_compactContainer = new QWidget(this);
+        m_compactContainer->setAttribute(Qt::WA_TransparentForMouseEvents, true);
         QHBoxLayout *compactLayout = new QHBoxLayout(m_compactContainer);
         compactLayout->setContentsMargins(8, 3, 10, 3);
         compactLayout->setSpacing(8);
 
         m_artCompact = new AlbumArtWidget(18, m_compactContainer);
+        m_artCompact->setAttribute(Qt::WA_TransparentForMouseEvents, true);
 
         m_compactTitle = new QLabel(QStringLiteral("Amazon Music"), m_compactContainer);
+        m_compactTitle->setAttribute(Qt::WA_TransparentForMouseEvents, true);
         m_compactTitle->setStyleSheet(
             "color: rgba(255, 255, 255, 0.92); font-family: 'Inter', 'Noto Sans', sans-serif; "
             "font-size: 11px; font-weight: 600; background: transparent;"
@@ -715,6 +749,7 @@ private:
         m_compactTitle->setAlignment(Qt::AlignVCenter | Qt::AlignLeft);
 
         m_eqCompact = new EqualizerWidget(m_compactContainer);
+        m_eqCompact->setAttribute(Qt::WA_TransparentForMouseEvents, true);
 
         compactLayout->addWidget(m_artCompact);
         compactLayout->addWidget(m_compactTitle, 1);
@@ -732,18 +767,21 @@ private:
         topRow->setSpacing(8);
 
         m_artExpanded = new AlbumArtWidget(30, m_expandedContainer);
+        m_artExpanded->setAttribute(Qt::WA_TransparentForMouseEvents, true);
 
         QVBoxLayout *metaLayout = new QVBoxLayout();
         metaLayout->setSpacing(0);
         metaLayout->setContentsMargins(0, 0, 0, 0);
 
         m_expTitle = new QLabel(QStringLiteral("Amazon Music Unlimited"), m_expandedContainer);
+        m_expTitle->setAttribute(Qt::WA_TransparentForMouseEvents, true);
         m_expTitle->setStyleSheet(
             "color: #FFFFFF; font-family: 'Inter', 'Noto Sans', sans-serif; "
             "font-size: 11.5px; font-weight: 600; background: transparent;"
         );
 
         m_expArtist = new QLabel(QStringLiteral("España"), m_expandedContainer);
+        m_expArtist->setAttribute(Qt::WA_TransparentForMouseEvents, true);
         m_expArtist->setStyleSheet(
             "color: rgba(255, 255, 255, 0.55); font-family: 'Inter', 'Noto Sans', sans-serif; "
             "font-size: 10px; font-weight: 500; background: transparent;"
@@ -1925,6 +1963,7 @@ private:
     int m_pendingArtistRequests = 0;
     int m_radarIndex = -1;
     qint64 m_lastRadarLaunchMs = 0;
+    qint64 m_lastDragStepMs = 0;
     qint64 m_trackStartEpoch = 0;
     int m_consecutiveSkips = 0;
     int m_radarCycle = 0;
