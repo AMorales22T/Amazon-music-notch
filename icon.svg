@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <!-- Deep Obsidian Apple-style Squircle Background -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#14151A"/>
+      <stop offset="50%" stop-color="#090A0D"/>
+      <stop offset="100%" stop-color="#020203"/>
+    </linearGradient>
+
+    <!-- Subtle Metallic Rim -->
+    <linearGradient id="rimGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.24"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0.04"/>
+    </linearGradient>
+
+    <!-- Sleek Silver/White Symbol Gradient (Antigravity / Apple Minimalist style) -->
+    <linearGradient id="symGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#A1A8B8"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Apple macOS Icon Squircle -->
+  <rect x="16" y="16" width="224" height="224" rx="52" ry="52" fill="url(#bgGrad)" stroke="url(#rimGrad)" stroke-width="2.5"/>
+
+  <!-- Top Dynamic Island Pill Silhouette -->
+  <rect x="76" y="38" width="104" height="22" rx="11" ry="11" fill="#000000" stroke="#FFFFFF" stroke-opacity="0.16" stroke-width="1.5"/>
+  <circle cx="164" cy="49" r="4" fill="#FFFFFF" fill-opacity="0.45"/>
+
+  <!-- Minimalist Antigravity / Orbital Geometric Mark in Center -->
+  <g transform="translate(128, 138)">
+    <!-- Outer sleek orbital ring -->
+    <ellipse cx="0" cy="0" rx="56" ry="22" transform="rotate(-24)" fill="none" stroke="url(#symGrad)" stroke-width="5.5" stroke-linecap="round"/>
+    <!-- Inner levitating core / delta -->
+    <path d="M 0 -38 L 28 22 L 0 10 L -28 22 Z" fill="url(#symGrad)"/>
+    <!-- Subtle floating acoustic pulse dots -->
+    <circle cx="0" cy="-50" r="4.5" fill="#FFFFFF"/>
+  </g>
+</svg>
