@@ -17,7 +17,7 @@ Una **Dynamic Island** minimalista estilo Apple para **Amazon Music (Unlimited /
 
 ## Vista Previa (ASCII UI)
 
-### 1. Modo Píldora Compacta (`216 x 26 px` — Consumo ~20 MB RAM)
+### 1. Modo Píldora Compacta (`216 x 26 px`)
 
 ```text
       .---------------------------------------------------.
@@ -91,7 +91,7 @@ Una **Dynamic Island** minimalista estilo Apple para **Amazon Music (Unlimited /
 - **SonicRadar (Generador de Playlist de Descubrimiento):** Con un clic, toma el artista actual o tus artistas escuchados recientemente, consulta afinidad real de oyentes mediante la API publica de Deezer, descarta canciones ya escuchadas en **FreshFlow** y genera una **playlist variada de 20 canciones (`SonicRadar Mix`)** que se reproduce de forma continua controlando el buscador interno (SPA) de Amazon Music sin recargar la pagina.
 - **Reproductor Amazon Music integrado:** Incluye el reproductor oficial de Amazon Music dentro del propio notch con soporte para **Widevine DRM** y modo escritorio forzado (sin bloqueos de *"Escuchar en la app"*).
 - **Ultra optimizado (Bajo consumo de RAM y CPU):**
-  - **Lazy-loading:** El motor web solo se inicializa cuando expandes el notch por primera vez; en modo pildora inicial consume ~20 MB de RAM y lee el estado directamente por **MPRIS2 D-Bus**.
+  - **Motor web siempre cargado:** Chromium se inicia con la app (Qt exige crear la vista web antes de la capa layer-shell); la pildora lee el estado por **MPRIS2 D-Bus** y por el propio reproductor.
   - **Sin re-alocacion de texturas en Wayland:** Transicion instantanea sin redimensionar el buffer de `QtWebEngine` fotograma a fotograma.
   - **Limite de memoria JS y procesos:** Configurado con `--renderer-process-limit=1` para mantener el consumo de recursos al minimo.
 - **Posicion libre o fija:** Boton de candado integrado para fijar la isla o arrastrarla libremente a cualquier punto de la pantalla.

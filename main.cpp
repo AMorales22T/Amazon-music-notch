@@ -1012,6 +1012,10 @@ private:
 
         m_expLayout->addWidget(m_playlistPanel);
 
+        // Debe crearse aqui, antes de setupLayerShell(): crear el QWebEngineView con la ventana ya mostrada
+        // recrea la ventana nativa y deja m_layerWindow colgando (SEGV en expand()). No hacerlo lazy.
+        ensureWebViewInitialized();
+
         holderLayout->addWidget(m_compactContainer);
         holderLayout->addWidget(m_expandedContainer);
     }
