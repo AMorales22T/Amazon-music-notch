@@ -13,6 +13,8 @@
 
 Una **Dynamic Island** minimalista estilo Apple para **Amazon Music (Unlimited / Free)** en Linux (Wayland / KDE Plasma), escrita de forma nativa en **C++17** con **Qt6**, **`LayerShellQt`** y **`KGlobalAccel`**.
 
+![ASCII Demo](./ascii-demo.gif)
+
 ---
 
 ## Vista Previa (ASCII UI)
